@@ -1,0 +1,779 @@
+---
+title: "projet"
+output: html_document
+date: "2024-05-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## projet statistique exploratoire des donneés
+
+```{r}
+#install.packages('dplyr')
+#install.packages("corrplot")
+#install.packages('kernlab')
+#install.packages('kknn')
+install.packages('tidyverse')
+#install.packages('DMwR')
+```
+
+```{r}
+# Load required libraries
+library(tidyverse)
+library(DMwR)
+library(corrplot)
+library(dplyr)
+library(caret)
+library(ROSE)
+library(randomForest)
+library(kernlab)
+library(kknn)
+library(nnet)
+library(ggplot2)
+```
+
+## introduction
+
+```{r}
+data <- read.csv("/home/rebhi/Desktop/projet-stat/Student Attitude and Behavior (1).csv")
+```
+
+```{r}
+# 1. Presentation of the dataset
+cat("Dataset Shape:", dim(data), "\n")
+cat("Columns:", colnames(data), "\n")
+cat("Sample Data:\n")
+print(head(data))
+```
+
+```{r}
+# 2. Informations sur les variables
+colSums(is.na(data))
+```
+
+```{r}
+# Print summary information about the dataset
+summary(data)
+
+# Check data types of each variable/column
+str(data)
+
+```
+
+```{r}
+summary(data)
+
+```
+
+```{r}
+# Get the names of columns with object data type
+object_columns <- names(data)[sapply(data, is.character)]
+
+# Loop through each object column and count unique values
+for (col in object_columns) {
+  unique_count <- length(unique(data[[col]]))
+  cat(paste(col, "has", unique_count, "unique values\n"))
+}
+
+```
+
+```{r}
+# Loop through each object column, count unique values, and print if there are only two unique values
+for (col in object_columns) {
+  unique_count <- length(unique(data[[col]]))
+  unique_names <- unique(data[[col]])
+  if (unique_count == 2) {
+    cat(paste(col, "has", unique_names, "\n"))
+  }
+}
+
+```
+
+```{r}
+colnames(data)
+
+```
+
+```{r}
+colnames(data)
+```
+
+```{r}
+# Rename columns
+names(data) <- c("certification", "gender", "dep", "height", "weight", 
+                 "mark10th", "mark12th", "collegemark", "hobbies","studytime", 
+                 "prefertime", "salexpect", "likedegree", "carrer_willing", 
+                 "smtime", "travel", "stress", "financial", "parttime")
+
+
+```
+
+```{r}
+# Identify categorical variables
+catCols <- names(data)[sapply(data, function(x) typeof(x) == "character")]
+print(catCols)
+```
+
+```{r}
+# Identify numerical variables
+numCols <- names(data)[sapply(data, is.numeric)]
+print(numCols)
+```
+
+## Analyse Univariée
+
+### **categorique**
+
+```{r}
+# Create the count plot
+ggplot(data, aes(x = certification)) +
+  geom_bar() +
+  ggtitle("Count of Students who Completed Certification Course") +
+  xlab("Certification Course") +
+  ylab("Count")
+```
+
+```{r}
+# Create the count plot for gender distribution
+ggplot(data, aes(x = gender)) +
+  geom_bar() +
+  ggtitle("Gender Distribution of Students") +
+  xlab("Gender") +
+  ylab("Count")
+```
+
+```{r}
+# 3. Department Distribution of Students (Bar Plot)
+ggplot(data, aes(y = dep)) +
+  geom_bar() +
+  ggtitle("Department Distribution of Students") +
+  xlab("Count") +
+  ylab("Department")
+
+```
+
+```{r}
+# 4. Boxplot for 10th Mark
+ggplot(data, aes(x = mark10th)) +
+  geom_boxplot() +
+  ggtitle("Boxplot of 10th Marks") +
+  xlab("10th Mark")
+```
+
+```{r}
+# Remove missing values from the 'hobbies' column
+cleaned_hobbies <- data$hobbies[!is.na(data$hobbies) & data$hobbies != ""]
+
+# Create a table of hobby counts
+hobbies_counts <- table(cleaned_hobbies)
+
+# Create the pie chart for hobbies
+pie(hobbies_counts, labels = names(hobbies_counts), main = "Hobbies")
+
+```
+
+```{r}
+# 6. Pie plot for part-time job
+part_time_count <- table(data$parttime)
+pie(part_time_count, labels = names(part_time_count), main = "Part-time Jobs")
+
+```
+
+### **variables continues**
+
+```{r}
+# Unique values of studytime
+unique(data$studytime)
+```
+
+```{r}
+studyTime <- function(x) {
+  x <- strsplit(x, " ")[[1]]
+  time <- numeric()
+  for (i in x) {
+    if (grepl("\\d+", i)) {
+      time <- c(time, as.numeric(i))
+    }
+  }
+  if (length(time) == 1) {
+    return(time[1] * 60)
+  } else if (length(time) == 2 && (("Hour" %in% x) || ("hour" %in% x))) {
+    return(((time[1] * 60 + time[2] * 60) / 2))
+  } else if (length(time) == 2) {
+    return((sum(time) / length(time)))
+  }
+}
+
+```
+
+```{r}
+# Apply studyTime function to studytime column
+data$studytime <- sapply(data$studytime, studyTime)
+
+```
+
+```{r}
+
+# Unique values of smtime
+unique(data$smtime)
+```
+
+```{r}
+socialTime <- function(x) {
+  x <- strsplit(x, " ")[[1]]
+  time <- numeric()
+  for (i in x) {
+    if (!is.na(as.numeric(i))) {
+      time <- c(time, as.numeric(i))
+    }
+  }
+  if (length(time) == 1) {
+    return(time[1] * 60)
+  } else if (length(time) == 2 && (("Hour" %in% x) || ("hour" %in% x))) {
+    return(((time[1] * 60) + (time[2] * 60)) / 2)
+  } else if (length(time) == 2) {
+    return((sum(time) / length(time)))
+  }
+}
+
+
+```
+
+```{r}
+# Apply socialTime function to smtime column
+data$smtime <- sapply(data$smtime, socialTime)
+```
+
+```{r}
+# Unique values of travel
+unique(data$travel)
+```
+
+```{r}
+# Apply socialTime function to travel column
+data$travel <- sapply(data$travel, socialTime)
+
+```
+
+```{r}
+# Remove '%' and convert carrer_willing to float
+data$carrer_willing <- as.numeric(gsub("%", "", data$carrer_willing))
+```
+
+```{r}
+# Kernel Density Estimation (KDE) plot for mark12th
+plot(density(data$mark12th), main="KDE plot for 12th Mark")
+summary(data$mark12th)
+```
+
+```{r}
+# Summary statistics for collegemark
+summary(data$collegemark)
+plot(density(data$collegemark), main="KDE plot for College Mark")
+```
+
+```{r}
+
+```
+
+```{r}
+# Summary statistics for height
+summary(data$height)
+```
+
+```{r}
+# Summary statistics for weight
+summary(data$weight)
+```
+
+## **Analyse Univariée**
+
+### Categorique vs Categorique
+
+```{r}
+# Hobbies vs gender (Pie chart)
+library(ggplot2)
+library(dplyr)
+
+hobbies_percentage <- data %>%
+  group_by(gender, hobbies) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = "", y = count, fill = hobbies)) +
+  geom_bar(stat = "identity", width = 1) +
+  facet_wrap(~gender) +
+  coord_polar("y", start = 0) +
+  theme_void() +
+  labs(fill = "Hobbies", title = "Hobbies Distribution by Gender") +
+  theme(legend.position = "right")
+
+print(hobbies_percentage)
+
+# Stress vs gender (Pie chart)
+stress_gender <- data %>%
+  group_by(gender, stress) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = "", y = count, fill = stress)) +
+  geom_bar(stat = "identity", width = 1) +
+  facet_wrap(~gender) +
+  coord_polar("y", start = 0) +
+  theme_void() +
+  labs(fill = "Stress", title = "Stress Distribution by Gender") +
+  theme(legend.position = "right")
+
+print(stress_gender)
+
+# Stress vs department
+stress_dep <- data %>%
+  group_by(dep, stress) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = dep, y = count, fill = stress)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Stress Distribution by Department") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+print(stress_dep)
+
+# Financial and Stress (Bar plot)
+financial_stress <- data %>%
+  group_by(financial, stress) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = financial, y = count, fill = stress)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Stress Distribution by Financial Status") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+print(financial_stress)
+
+# Part-time and Stress (Bar plot)
+parttime_stress <- data %>%
+  group_by(parttime, stress) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = parttime, y = count, fill = stress)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Stress Distribution by Part-time Job") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+print(parttime_stress)
+
+# Gender and part-time_job (Pie chart)
+parttime_gender <- data %>%
+  group_by(parttime, gender) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  ggplot(aes(x = "", y = count, fill = gender)) +
+  geom_bar(stat = "identity", width = 1) +
+  facet_wrap(~parttime) +
+  coord_polar("y", start = 0) +
+  theme_void() +
+  labs(fill = "Gender", title = "Gender Participation in Part-time Job") +
+  theme(legend.position = "right")
+
+print(parttime_gender)
+
+```
+
+### **Continue vs Categorique**
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# College mark group by Students Stress Level
+data_stress <- data %>%
+  group_by(stress) %>%
+  summarise(mean_collegemark = mean(collegemark, na.rm = TRUE),
+            median_collegemark = median(collegemark, na.rm = TRUE))
+
+print(data_stress)
+
+# College Marks by Stress Level (Bar plot)
+ggplot(data_stress, aes(x = stress, y = mean_collegemark, fill = stress)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_bar(aes(x = stress, y = median_collegemark), stat = "identity", position = "dodge", alpha = 0.5) +
+  labs(x = "Stress Level", y = "College Mark", fill = "Stress Level", title = "College Marks by Stress Level") +
+  theme_minimal()
+
+# Study time, Social Media time, and Travel time by Gender and Stress Level
+data_grouped <- data %>%
+  group_by(stress, gender) %>%
+  summarise(mean_studytime = mean(studytime, na.rm = TRUE),
+            mean_smtime = mean(smtime, na.rm = TRUE),
+            mean_travel = mean(travel, na.rm = TRUE), .groups = "drop")
+
+print(data_grouped)
+
+# Plot of Study time and Social Media time by Stress Level
+ggplot(data_grouped, aes(x = stress, y = mean_smtime, fill = gender)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_line(aes(x = stress, y = mean_studytime, group = gender, color = gender)) +
+  labs(x = "Stress Level", y = "Time (minutes)", fill = "Gender", color = "Gender",
+       title = "Impact of Stress on Study and Social Media") +
+  theme_minimal()
+
+# Histogram of Height by Gender
+ggplot(data, aes(x = height, fill = gender)) +
+  geom_histogram(binwidth = 5, position = "identity", alpha = 0.7) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  labs(x = "Height", title = "Height Histogram", fill = "Gender") +
+  theme_minimal()
+
+# Histogram of Weight by Gender
+ggplot(data, aes(x = weight, fill = gender)) +
+  geom_histogram(binwidth = 5, position = "identity", alpha = 0.7) +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5) +
+  labs(x = "Weight", title = "Weight Histogram", fill = "Gender") +
+  theme_minimal()
+
+```
+
+### continue vs continue
+
+```{r}
+library(ggplot2)
+
+# 12th_Mark vs 10th_Mark
+ggplot(data, aes(x = mark12th, y = mark10th)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "10th vs 12th Grade Mark")
+
+# 10th Grade vs College Mark
+ggplot(data, aes(x = collegemark, y = mark10th)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "10th Grade vs College Mark")
+
+# 12th Grade vs College Mark
+ggplot(data, aes(x = collegemark, y = mark12th)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "12th Grade vs College Mark")
+
+# Hexagonal Binning Plot: collegemark vs. salexpect
+ggplot(data, aes(x = collegemark, y = salexpect)) +
+  geom_hex(bins = 20) +
+  labs(x = "College Mark", y = "Salary Expectation", title = "Hexagonal Binning Plot")
+1
+```
+
+## Matrice de Correlation
+
+```{r}
+
+# Compute correlation matrix
+correlation_matrix <- cor(data[,numCols])
+
+# Plot correlation matrix as heatmap
+corrplot(correlation_matrix, method = "color", type = "upper", 
+         addCoef.col = "black", number.cex = 0.7, tl.cex = 0.7)
+title("Correlation Map")
+```
+
+## Predection des variables endogenes avec des algorithmes de machine learning
+
+### Stress
+
+```{r}
+# Define ordinal mapping
+ordinal_mapping <- c('Awful' = 0, 'Bad' = 1, 'Good' = 2, 'fabulous' = 3)
+
+# Map stress levels to ordinal values
+df$Stress <- ordinal_mapping[df$stress]
+
+# Drop the original stress column
+df <- df %>% select(-stress)
+
+# Columns to encode
+columns_to_encode <- c('certification', 'gender', 'dep', 'hobbies', 'prefertime', 'likedegree', 'financial', 'parttime')
+
+# One-hot encode categorical variables
+one_hot_encoded_df <- df %>%
+  select(columns_to_encode) %>%
+  one_hot()
+
+# Drop original columns and concatenate one-hot encoded columns
+df <- df %>%
+  select(-columns_to_encode) %>%
+  bind_cols(one_hot_encoded_df)
+
+# Normalize numerical columns
+columns_to_normalize <- c('height', 'weight', 'mark10th', 'mark12th', 'collegemark', 'studytime')
+df[columns_to_normalize] <- scale(df[columns_to_normalize])
+
+# Standardize salexpect column
+df$salexpect <- scale(df$salexpect)
+
+# Split data into features and target
+X <- df %>%
+  select(-Stress)
+y <- df$Stress
+
+# Split data into train and test sets
+set.seed(42)
+train_indices <- createDataPartition(y, p = 0.8, list = FALSE)
+X_train <- X[train_indices, ]
+y_train <- y[train_indices]
+X_test <- X[-train_indices, ]
+y_test <- y[-train_indices]
+
+# Apply SMOTE to the training data
+df_train <- cbind(X_train, y_train)
+df_train_resampled <- SMOTE(Stress ~ ., df_train, k = 5)
+
+# Classifiers
+classifiers <- list(
+  'Logistic Regression' = train(Stress ~ ., data = df_train_resampled, method = 'glm', trControl = trainControl(method = 'cv')),
+  'Decision Tree' = train(Stress ~ ., data = df_train_resampled, method = 'rpart', trControl = trainControl(method = 'cv')),
+  'Random Forest' = train(Stress ~ ., data = df_train_resampled, method = 'rf', trControl = trainControl(method = 'cv')),
+  'K Nearest Neighbors' = train(Stress ~ ., data = df_train_resampled, method = 'knn', trControl = trainControl(method = 'cv')),
+  'Support Vector Machine' = train(Stress ~ ., data = df_train_resampled, method = 'svmRadial', trControl = trainControl(method = 'cv'))
+)
+
+# Evaluate each classifier
+for (name in names(classifiers)) {
+  model <- classifiers[[name]]
+  y_pred <- predict(model, X_test)
+  accuracy <- confusionMatrix(y_pred, y_test)$overall['Accuracy']
+  precision <- confusionMatrix(y_pred, y_test)$byClass['Precision']
+  recall <- confusionMatrix(y_pred, y_test)$byClass['Recall']
+  f1 <- confusionMatrix(y_pred, y_test)$byClass['F1']
+  r2 <- R2(y_pred, y_test)
+  cat(paste0(name, " Metrics:\n"))
+  cat(sprintf('Accuracy: %.2f\n', accuracy))
+  cat(sprintf('Recall: %.2f\n', recall))
+  cat(sprintf('F1-score: %.2f\n', f1))
+  cat(sprintf('R2 Score: %.2f\n\n', r2))
+
+  # Plotting actual vs predicted
+  plot(y_test, y_pred, xlab = "Actual", ylab = "Predicted", main = paste(name, " - Actual vs Predicted"))
+  abline(0, 1, col = "red", lty = 2)
+}
+```
+
+### College Mark
+
+```{r}
+# Assigning 'data' to 'df0'
+df0 <- data
+
+# Displaying the first few rows of the dataframe
+head(df0)
+```
+
+```{r}
+library(caret)
+library(DMwR)
+library(data.table)
+library(mlr)
+library(lime)
+library(xgboost)
+library(lightgbm)
+library(randomForest)
+library(glmnet)
+library(ggplot2)
+library(tidyr)
+library(cowplot)
+
+# Load data
+df <- fread("your_data.csv")
+
+# Define functions for data preprocessing
+Yes_No <- function(value) {
+  if (value == 'Yes') {
+    return(1)
+  } else if (value == 'No') {
+    return(0)
+  }
+}
+
+Gender <- function(value) {
+  if (value == 'Male') {
+    return(1)
+  } else if (value == 'Female') {
+    return(0)
+  }
+}
+
+# Apply functions to specific columns
+df[, certification := sapply(certification, Yes_No)]
+df[, likedegree := sapply(likedegree, Yes_No)]
+df[, parttime := sapply(parttime, Yes_No)]
+df[, gender := sapply(gender, Gender)]
+
+# One-hot encoding for categorical variables
+df <- df %>%
+  mutate_at(vars(certification, gender, dep, hobbies, prefertime, likedegree, financial, parttime), as.factor) %>%
+  dummy_cols(remove_most_frequent_dummy = TRUE)
+
+# Define evaluation functions
+evaluate_models_all <- function(X, y) {
+  set.seed(42)
+  train_control <- trainControl(method = "cv", number = 5)
+  models <- list(
+    "Linear Regression" = train(y ~ ., data = X, method = "lm", trControl = train_control),
+    "Ridge Regression" = train(y ~ ., data = X, method = "ridge", trControl = train_control),
+    "Lasso Regression" = train(y ~ ., data = X, method = "lasso", trControl = train_control),
+    "ElasticNet" = train(y ~ ., data = X, method = "glmnet", trControl = train_control)
+  )
+  
+  results <- lapply(models, function(model) {
+    preds <- predict(model, newdata = X_test)
+    rmse <- sqrt(mean((preds - y_test)^2))
+    r2 <- cor(preds, y_test)^2
+    return(c(RMSE = rmse, R2 = r2))
+  })
+  
+  return(data.frame(Model = names(results), do.call(rbind, results)))
+}
+
+evaluate_models_RGXL <- function(X, y) {
+  set.seed(42)
+  train_control <- trainControl(method = "cv", number = 5)
+  models <- list(
+    "Random Forest Regressor" = train(y ~ ., data = X, method = "rf", trControl = train_control),
+    "Gradient Boosting Regressor" = train(y ~ ., data = X, method = "gbm", trControl = train_control),
+    "XGBoost Regressor" = train(y ~ ., data = X, method = "xgbTree", trControl = train_control),
+    "LightGBM Regressor" = train(y ~ ., data = X, method = "lightgbm", trControl = train_control)
+  )
+  
+  results <- lapply(models, function(model) {
+    preds <- predict(model, newdata = X_test)
+    rmse <- sqrt(mean((preds - y_test)^2))
+    r2 <- cor(preds, y_test)^2
+    return(c(RMSE = rmse, R2 = r2))
+  })
+  
+  return(data.frame(Model = names(results), do.call(rbind, results)))
+}
+
+# Preprocess and evaluate models
+X <- df[, !"collegemark"]
+y <- df$collegemark
+
+# Split data
+train_indices <- createDataPartition(y, p = 0.8, list = FALSE)
+X_train <- X[train_indices, ]
+y_train <- y[train_indices]
+X_test <- X[-train_indices, ]
+y_test <- y[-train_indices, ]
+
+# Apply SMOTE to handle class imbalance if needed
+# Not shown here for brevity
+
+# Evaluate models
+results_all <- evaluate_models_all(X_train, y_train)
+results_RGXL <- evaluate_models_RGXL(X_train, y_train)
+
+# Print results
+print(results_all)
+print(results_RGXL)
+
+# Make predictions with best model (e.g., LightGBM)
+# Train final model
+best_lightgbm <- train(y ~ ., data = df, method = "lightgbm", trControl = train_control)
+
+# Predict on test data
+predictions <- predict(best_lightgbm, newdata = X_test)
+
+# Evaluate predictions
+rmse <- sqrt(mean((predictions - y_test)^2))
+mae <- mean(abs(predictions - y_test))
+r2 <- cor(predictions, y_test)^2
+
+print("RMSE:", round(rmse, 5))
+print("MAE:", round(mae, 5))
+print("R-squared:", round(r2, 5))
+
+# Plot actual vs predicted
+comparison <- data.frame(actual = y_test, pred = predictions)
+ggplot(comparison, aes(x = actual, y = pred)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(x = "Actual", y = "Predicted", title = "Actual vs Predicted")
+
+# Plot feature importance
+feature_importance <- as.data.frame(feature_importance(best_lightgbm$finalModel))
+top_features <- head(feature_importance[order(feature_importance$Importance, decreasing = TRUE), ], 5)
+ggplot(top_features, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(x = "Feature", y = "Importance", title = "Top 5 Feature Importance") +
+  theme_minimal()
+
+```
+
+## PCA 
+
+```{r}
+library(reshape2)
+library(ggplot2)
+library(FactoMineR)
+library(plotly)
+
+# Plotting the covariance matrix as a heatmap
+img <- heatmap(cov_data, col = rev(rainbow(100)), symm = TRUE, scale = "none", margins = c(5, 10))
+
+# Adding text annotations to each cell
+text <- sapply(seq_len(nrow(cov_data)), function(x) {
+  sapply(seq_len(ncol(cov_data)), function(y) {
+    paste0(format(cov_data[x, y], digits = 2), "\n")
+  })
+})
+text(1, 1, labels = text, cex = 0.7)
+
+# Eigen decomposition
+eigen_res <- eigen(cov_data)
+eigenvalues <- eigen_res$values
+eigenvectors <- eigen_res$vectors
+
+# Sort eigenvalues and their corresponding eigenvectors in descending order
+sorted_indices <- order(-eigenvalues)
+sorted_eigenvalues <- eigenvalues[sorted_indices]
+sorted_eigenvectors <- eigenvectors[, sorted_indices]
+
+# Print sorted eigenvalues and eigenvectors
+print("Sorted Eigenvalues:")
+print(sorted_eigenvalues)
+print("\nSorted Eigenvectors:")
+print(sorted_eigenvectors)
+
+# Plot contribution
+plot_contribution <- function(data) {
+  total_sum <- sum(data)
+  percentages <- data / total_sum * 100
+  barplot(percentages, xlab = "Data Index", ylab = "Percentage Contribution (%)", main = "Contribution of Each Value", col = "skyblue")
+}
+
+plot_contribution(sorted_eigenvalues)
+
+# Perform PCA with 8 components
+pca_res <- PCA(df1[numCols], scale.unit = TRUE, graph = FALSE, ncp = 8)
+
+# Extract principal components
+principal_components <- as.data.frame(pca_res$ind$coord)
+colnames(principal_components) <- paste0("principal component ", 1:8)
+
+# Option 1: Combine features and principal components
+finalDf_option1 <- cbind(principal_components, df1)
+
+# Option 2: Add separate principal component rows
+finalDf_option2 <- rbind(df1, principal_components)
+
+# Choose the final DataFrame based on your needs
+finalDf <- finalDf_option1  # Combine features and principal components
+#finalDf <- finalDf_option2  # Add separate principal component rows
+
+print(finalDf)  # Display the final DataFrame
+
+# 3D visualization
+pca_data_3d <- pca_res$ind$coord[, 1:3]
+colnames(pca_data_3d) <- paste0("PC", 1:3)
+
+# Create a 3D scatter plot
+scatterplot3d(pca_data_3d, type = "h", main = "PCA Visualization (First 3 Components)", pch = 19, color = "blue", angle = 55)
+
+```
