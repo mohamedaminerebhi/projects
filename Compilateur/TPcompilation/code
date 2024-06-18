@@ -1,0 +1,39 @@
+int main() {
+    int array[5];
+    int sum ;
+    int max;
+    int min;
+    float average;
+    int i;
+
+    printf("Enter 5 integers:\n");
+    for (int i = 0; i < 5; i++) {
+        scanf("%d", & array[i]);
+    }
+
+    for (int i = 0; i < 5; i++) {
+        sum += array[i]
+    };
+
+    max = array[0];
+    min = array[0];
+
+    for (int i = 1; i < 5; i++) {
+        if (array[i] > max) {
+            max = array[i];
+        };
+        if (array[i] < min) {
+            min = array[i];
+        }
+    };
+
+    average = sum / 5;
+
+    printf("Sum of the entered integers: %d\n", sum);
+    printf("Maximum integer entered: %d\n", max);
+    printf("Minimum integer entered: %d\n", min);
+    printf("Average of the entered integers: %.2f\n", average);
+
+    return 0;
+}
+
